@@ -2,7 +2,7 @@
 name: searxng-search
 description: Web search using SearXNG instance via MCP. Provides web search capability for agents with configurable SearXNG endpoint.
 author: zfanmy-梦月儿
-version: 1.0.0
+version: 1.0.1
 homepage: 
 license: MIT
 keywords:
