@@ -4,7 +4,7 @@
 name: openclaw-deploy
 description: Build and deploy OpenClaw as Docker images or portable packages
 author: zfanmy-梦月儿
-version: 1.0.0
+version: 1.0.1
 homepage: 
 license: MIT
 keywords:
@@ -88,6 +88,44 @@ open http://localhost:18789
 - Node.js 22.x
 - Docker (optional, for Docker builds)
 - curl, rsync (for deployment)
+
+## Configuration
+
+### Environment Variables
+
+You can customize paths using environment variables:
+
+```bash
+# OpenClaw installation directory (default: auto-detect)
+export OPENCLAW_INSTALL_DIR=/path/to/openclaw
+
+# OpenClaw config directory (default: ~/.openclaw)
+export OPENCLAW_CONFIG_DIR=/path/to/.openclaw
+
+# Output directory (default: ./openclaw-portable-output)
+export OUTPUT_DIR=/path/to/output
+```
+
+### Example with Custom Paths
+
+```bash
+export OPENCLAW_INSTALL_DIR=/opt/openclaw
+export OPENCLAW_CONFIG_DIR=/opt/config/.openclaw
+export OUTPUT_DIR=/tmp/openclaw-packages
+
+./scripts/build-portable.sh
+```
+
+## Changelog
+
+### v1.0.1
+- Fixed hardcoded paths
+- Added environment variable support
+- Improved error handling and dependency checks
+- Added path validation
+
+### v1.0.0
+- Initial release
 
 ## Author
 
