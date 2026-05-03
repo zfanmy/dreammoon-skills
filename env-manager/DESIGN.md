@@ -32,7 +32,7 @@
 └──────────┼─────────┼──────────┼───────┼──────────────┘
            │         │          │       │
       ┌────▼──┐ ┌───▼───┐ ┌───▼──┐ ┌──▼──┐
-      │macmini│ │  xgp  │ │ ncu  │ │ tuf │
+      │local-  │ │ remote-│ │ gpu-   │ │ backup│
       └───────┘ └───────┘ └──────┘ └─────┘
 ```
 
@@ -47,12 +47,12 @@
 ### 数据流
 
 ```
-用户/LLM 发起意图: "在 xgp 上部署 redis"
+用户/LLM 发起意图: "在 remote-server 上部署 redis"
         │
         ▼
-  ┌─ preflight_check(node="xgp", requirements={port:6379, mem:"256MB"})
+  ┌─ preflight_check(node="remote-server", requirements={port:6379, mem:"256MB"})
   │     │
-  │     ├─ Scanner.scan_node("xgp")  ──SSH──▶  xgp  ──▶ 采集快照
+  │     ├─ Scanner.scan_node("remote-server")  ──SSH──▶  remote-server  ──▶ 采集快照
   │     │
   │     ├─ Registry.find_port(6379)   ──▶ 检查端口冲突
   │     │
@@ -70,7 +70,7 @@
 理由：
 - 单二进制分发，零依赖，符合轻量化要求
 - 原生 SSH 库（`golang.org/x/crypto/ssh`）成熟
-- 交叉编译覆盖 amd64/arm64（macmini M系列）
+- 交叉编译覆盖 amd64/arm64（generic ARM64）
 - OpenClaw 生态本身偏 Go 友好
 
 ### 关键依赖
@@ -102,7 +102,7 @@ tools:
     parameters:
       node:
         type: string
-        description: "节点名称: macmini | xgp | ncu | tuf"
+        description: "节点名称: local-server | remote-server | gpu-node"
         required: true
       scope:
         type: string
@@ -201,21 +201,21 @@ capabilities:
 ```yaml
 # config.yaml
 nodes:
-  - name: macmini
+  - name: local-server
     host: 192.168.1.10
     user: admin
     auth: key          # key | password | agent
     key_path: ~/.ssh/id_ed25519
     tags: [arm64, macos]
 
-  - name: xgp
+  - name: remote-server
     host: 192.168.1.20
     user: user
     auth: agent
     tags: [amd64, linux, gpu]
     gpu_type: nvidia
 
-  - name: ncu
+  - name: gpu-node
     host: 192.168.1.30
     user: user
     auth: key
@@ -223,7 +223,7 @@ nodes:
     tags: [amd64, linux, gpu]
     gpu_type: nvidia
 
-  - name: tuf
+  - name: backup-node
     host: localhost     # 本机直接执行，不走 SSH
     local: true
     tags: [amd64, linux, gpu]
@@ -259,7 +259,7 @@ type SSHExecutor struct {
 ```
 
 关键设计决策：
-- 本地节点（tuf）直接执行命令，零开销
+- 本地节点（backup-node）直接执行命令，零开销
 - 远程节点维护 SSH 连接池，避免每次扫描重新握手
 - 所有采集逻辑统一为 shell 命令，通过 Executor 接口透明执行
 - 并行扫描所有节点，单节点超时不阻塞其他节点
@@ -458,10 +458,10 @@ CREATE TABLE snapshots (
 编辑节点信息：
 
     nodes:
-      - name: tuf
+      - name: backup-node
         host: localhost
         local: true
-      - name: xgp
+      - name: remote-server
         host: 192.168.1.20
         user: user
         auth: agent
@@ -481,15 +481,15 @@ CREATE TABLE snapshots (
 
 **自然语言（通过 LLM）：**
 
-- "xgp 上还有多少内存？"
-- "帮我在 ncu 上找一个 8000-9000 之间的可用端口"
-- "我要在 macmini 上部署一个需要 4GB 内存和 6379 端口的 Redis，可以吗？"
+- "remote-server 上还有多少内存？"
+- "帮我在 gpu-node 上找一个 8000-9000 之间的可用端口"
+- "我要在 local-server 上部署一个需要 4GB 内存和 6379 端口的 Redis，可以吗？"
 
 **工具调用：**
 
     // preflight_check
     {
-      "node": "xgp",
+      "node": "remote-server",
       "requirements": {
         "ports": [8080, 8443],
         "min_memory_mb": 2048,
@@ -518,7 +518,7 @@ MIT
 
 ```
 Phase 1 (MVP) ─ 1~2 周
-├── 本地节点扫描 (tuf)
+├── 本地节点扫描
 ├── scan_node + list_services 工具
 ├── JSON 文件持久化
 └── OpenClaw stdio 集成

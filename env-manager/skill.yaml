@@ -18,7 +18,7 @@ tools:
     parameters:
       node:
         type: string
-        description: "节点名称，如: macmini | xgp | ncu | tuf"
+        description: "节点名称，如: local-server | remote-server | gpu-node"
         required: true
       scope:
         type: string

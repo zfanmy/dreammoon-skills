@@ -83,37 +83,16 @@ func defaultDataDir() string {
 }
 
 func defaultNodes() []NodeConfig {
+	// Return a single generic example node instead of hardcoding personal cluster
+	// Users should create their own config.yaml with real nodes
 	return []NodeConfig{
 		{
-			Name:  "tuf",
-			Host:  "localhost",
-			Local: true,
-			Tags:  []string{"amd64", "linux", "gpu"},
-			GPUType: "nvidia",
-		},
-		{
-			Name:    "xgp",
-			Host:    "43.128.106.165",
-			Port:    9070,
-			User:    "root",
-			Auth:    "key",
-			KeyPath: "~/.ssh/id_ed25519.macmini",
-			Tags:    []string{"amd64", "linux"},
-		},
-		{
-			Name:    "ncu",
-			Host:    "192.168.0.108",
-			Port:    9070,
-			User:    "zfanmy",
-			Auth:    "key",
-			KeyPath: "~/.ssh/id_ed25519.macmini",
-			Tags:    []string{"amd64", "linux", "gpu"},
-			GPUType: "nvidia",
-		},
-		{
-			Name:  "macmini",
-			Host:  "localhost",
-			Local: true,
+			Name:  "example-node",
+			Host:  "192.168.1.10",
+			Port:  22,
+			User:  "user",
+			Auth:  "key",
+			KeyPath: "~/.ssh/id_rsa",
 			Tags:  []string{"amd64", "linux"},
 		},
 	}

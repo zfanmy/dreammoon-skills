@@ -14,10 +14,10 @@
 
 ## 为什么需要它
 
-在多节点开发/生产环境中（如 `macmini` + `xgp` + `ncu` + `tuf`），经常遇到：
-- "我要在 xgp 上跑个新服务，但不知道 8080 端口被谁占了"
-- "tuf 的 GPU 还剩多少显存？能不能再跑一个推理服务？"
-- "准备部署 Redis，先帮我看看 ncu 的资源够不够"
+在多节点开发/生产环境中（如 `server-1` + `web-node` + `gpu-cluster`），经常遇到：
+- "我要在 web-node 上跑个新服务，但不知道 8080 端口被谁占了"
+- "gpu-cluster 的 GPU 还剩多少显存？能不能再跑一个推理服务？"
+- "准备部署 Redis，先帮我看看 server-1 的资源够不够"
 
 传统监控工具（Prometheus/Netdata）回答的是"过去发生了什么"。`env-manager` 回答的是"现在能不能做这件事"。
 
@@ -52,9 +52,10 @@
 │  │  └────┬─────────┬──────────┬───────┬────┘    │ │
 │  └───────┼─────────┼──────────┼───────┼─────────┘
 │          │         │          │       │
-     ┌────▼──┐ ┌───▼───┐ ┌───▼──┐ ┌──▼──┐
-     │macmini│ │  xgp  │ │ ncu  │ │ tuf │
-     └───────┘ └───────┘ └───────┘ └─────┘
+     ┌────▼──┐ ┌───▼────┐ ┌───▼────┐ ┌──▼────┐
+     │local-  │ │ remote-│ │ gpu-   │ │ backup│
+     │server  │ │ server │ │ node   │ │ node  │
+     └───────┘ └────────┘ └────────┘ └───────┘
 ```
 
 ### 三大模块
@@ -81,33 +82,27 @@ openclaw skill clone https://github.com/zfanmy/dreammoon-skills.git --subpath sk
 
 ```yaml
 nodes:
-  - name: tuf
-    host: localhost
-    local: true
-    tags: [amd64, linux, gpu]
-    gpu_type: nvidia
-
-  - name: xgp
-    host: 43.128.106.165
-    user: root
-    port: 9070
-    auth: key
-    key_path: ~/.ssh/id_ed25519.macmini
-    tags: [amd64, linux]
-
-  - name: ncu
-    host: 192.168.0.108
-    user: zfanmy
-    port: 9070
-    auth: key
-    key_path: ~/.ssh/id_ed25519.macmini
-    tags: [amd64, linux, gpu]
-    gpu_type: nvidia
-
-  - name: macmini
+  - name: local-server
     host: localhost
     local: true
     tags: [amd64, linux]
+
+  - name: remote-server
+    host: 192.168.1.10
+    user: admin
+    port: 22
+    auth: key
+    key_path: ~/.ssh/id_rsa
+    tags: [amd64, linux]
+
+  - name: gpu-node
+    host: 10.0.0.5
+    user: admin
+    port: 22
+    auth: key
+    key_path: ~/.ssh/id_rsa
+    tags: [amd64, linux, gpu]
+    gpu_type: nvidia
 
 settings:
   scan_timeout: 10s
@@ -134,17 +129,17 @@ settings:
 
 **自然语言（通过 LLM）：**
 
-- "xgp 上还有多少内存？"
-- "帮我在 ncu 上找一个 8000-9000 之间的可用端口"
-- "我要在 macmini 上部署一个需要 4GB 内存和 6379 端口的 Redis，可以吗？"
-- "tuf 的 GPU 还剩多少显存？"
+- "remote-server 上还有多少内存？"
+- "帮我在 gpu-node 上找一个 8000-9000 之间的可用端口"
+- "我要在 local-server 上部署一个需要 4GB 内存和 6379 端口的 Redis，可以吗？"
+- "gpu-node 的 GPU 还剩多少显存？"
 
 **工具调用：**
 
 ```json
 // preflight_check
 {
-  "node": "xgp",
+  "node": "remote-server",
   "requirements": {
     "ports": [8080, 8443],
     "min_memory_mb": 2048,
@@ -155,7 +150,7 @@ settings:
 // 返回示例
 {
   "ok": true,
-  "node": "xgp",
+  "node": "remote-server",
   "warnings": ["磁盘使用率 88%，接近阈值"],
   "snapshot": {
     "cpu": { "cores": 8, "usage_percent": 23.5 },
@@ -178,10 +173,10 @@ settings:
 
 ## 技术选型
 
-- **语言**: Go（单二进制分发，~10MB，零依赖）
-- **采集库**: `gopsutil`（跨平台 CPU/内存/磁盘）
+- **语言**: Go（单二进制分发，~6MB，零依赖）
+- **采集方式**: 原生 shell 命令（`ss`, `free`, `df`, `nvidia-smi` 等），跨平台兼容
 - **远程执行**: 原生 SSH 库 + 连接池
-- **持久化**: SQLite（单文件，CGO-free 驱动）
+- **持久化**: JSON 文件（轻量，无需 CGO/SQLite）
 - **传输协议**: stdio JSON-RPC（与 OpenClaw 原生兼容）
 
 ## 项目结构
@@ -226,7 +221,7 @@ env-manager/
 
 ```
 Phase 1 (MVP) ─ 1~2 周
-├── 本地节点扫描 (tuf)
+├── 本地节点扫描
 ├── scan_node + list_services 工具
 ├── JSON 文件持久化
 └── OpenClaw stdio 集成
@@ -234,8 +229,8 @@ Phase 1 (MVP) ─ 1~2 周
 Phase 2 ─ 第 3 周
 ├── SSH 远程扫描 (多节点)
 ├── preflight_check + allocate_port
-├── SQLite 持久化
-└── 扫描结果缓存
+├── 扫描结果缓存
+└── 服务注册表同步
 
 Phase 3 ─ 第 4 周
 ├── 主动告警 (阈值触发)
@@ -249,7 +244,7 @@ Phase 3 ─ 第 4 周
 - **节点 OS**: Linux (amd64/arm64), macOS (arm64)
 - **OpenClaw**: >= 0.1.0
 - **传输协议**: stdio (JSON-RPC)
-- **Go 版本**: >= 1.21
+- **Go 版本**: >= 1.19
 
 ## 与其他技能的协作
 
