@@ -288,7 +288,8 @@ func (s *Scanner) scanMemory(ctx context.Context, exec connector.Executor) (Memo
 	var info MemoryInfo
 
 	if exec.OS() == "linux" {
-		out, _, err := exec.Run(ctx, "free -b | awk '/Mem:/{print $2,$3,$7}'")
+		// Use NR==2 to get the second line (memory line) regardless of locale
+		out, _, err := exec.Run(ctx, "free -b | awk 'NR==2{print $2,$3,$7}'")
 		if err != nil {
 			return info, err
 		}
@@ -304,14 +305,6 @@ func (s *Scanner) scanMemory(ctx context.Context, exec connector.Executor) (Memo
 				info.UsagePercent = float64(info.UsedMB) / float64(info.TotalMB) * 100
 			}
 		}
-	} else {
-		// macOS - vm_stat
-		out, _, err := exec.Run(ctx, "vm_stat | grep 'Pages free' | awk '{print $3}' | tr -d '.'")
-		if err != nil {
-			return info, err
-		}
-		// Simplified - full implementation would parse all vm_stat lines
-		_ = out
 	}
 
 	return info, nil
