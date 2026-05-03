@@ -1,0 +1,54 @@
+# env-manager 配置文件示例
+# 适配 DreamMoon 集群 (macmini / xgp / ncu / tuf)
+
+nodes:
+  # 本地节点 - macmini (主节点)
+  - name: macmini
+    host: localhost
+    local: true
+    tags: [amd64, linux]
+
+  # 远程节点 - xgp (热备节点，外网访问)
+  - name: xgp
+    host: 43.128.106.165
+    port: 9070
+    user: root
+    auth: key
+    key_path: ~/.ssh/id_ed25519.macmini
+    tags: [amd64, linux]
+
+  # 远程节点 - ncu (计算节点)
+  - name: ncu
+    host: 192.168.0.108
+    port: 9070
+    user: zfanmy
+    auth: key
+    key_path: ~/.ssh/id_ed25519.macmini
+    tags: [amd64, linux, gpu]
+    gpu_type: nvidia
+
+  # 远程节点 - tuf (GPU节点)
+  - name: tuf
+    host: localhost
+    local: true
+    tags: [amd64, linux, gpu]
+    gpu_type: nvidia
+
+settings:
+  # 单次扫描超时时间
+  scan_timeout: 10s
+
+  # SSH连接池大小（每节点）
+  ssh_pool_size: 2
+
+  # 扫描结果缓存时间
+  cache_ttl: 30s
+
+  # 告警阈值
+  alert_thresholds:
+    cpu_percent: 90
+    memory_percent: 85
+    disk_percent: 90
+
+# 数据存储目录
+# data_dir: ~/.openclaw/skills/env-manager/data

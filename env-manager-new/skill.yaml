@@ -1,0 +1,117 @@
+---
+name: env-manager
+description: >
+  多节点环境管理服务。扫描裸机和容器的服务、端口、资源（CPU/内存/磁盘/GPU），
+  支持部署前预检和端口分配。让 AI Agent 拥有集群级别的环境感知能力。
+  适用于多节点开发/生产环境，无需在远程节点安装 Agent，通过 SSH 远程采集。
+version: 0.1.0
+author: DreamMoon
+runtime: binary
+entry: ./env-manager serve --config ./config.yaml
+transport: stdio
+capabilities:
+  tools: true
+  alerts: true
+tools:
+  - name: scan_node
+    description: 扫描指定节点的资源和服务状态
+    parameters:
+      node:
+        type: string
+        description: "节点名称，如: macmini | xgp | ncu | tuf"
+        required: true
+      scope:
+        type: string
+        enum: [all, bare, container, ports, resources]
+        default: all
+        description: 扫描范围
+    returns:
+      type: object
+      description: 节点快照，包含 CPU/内存/磁盘/GPU/端口/服务信息
+
+  - name: scan_all
+    description: 并行扫描所有节点，返回集群全景
+    parameters: {}
+    returns:
+      type: object
+      description: 所有节点的快照集合
+
+  - name: list_services
+    description: 查询已注册的服务列表，支持按节点/端口/名称过滤
+    parameters:
+      node:
+        type: string
+        required: false
+      port:
+        type: integer
+        required: false
+      name:
+        type: string
+        required: false
+    returns:
+      type: array
+      description: 匹配的服务列表
+
+  - name: find_port
+    description: 查找端口在哪个节点被谁占用
+    parameters:
+      port:
+        type: integer
+        required: true
+        description: 要查找的端口号
+      node:
+        type: string
+        required: false
+        description: 不指定则搜索所有节点
+    returns:
+      type: object
+      description: 端口占用信息
+
+  - name: preflight_check
+    description: 部署前预检：检查目标节点是否满足资源和端口要求
+    parameters:
+      node:
+        type: string
+        required: true
+      requirements:
+        type: object
+        required: true
+        properties:
+          ports:
+            type: array
+            items: { type: integer }
+            description: 需要占用的端口列表
+          min_memory_mb:
+            type: integer
+            description: 最低可用内存要求(MB)
+          min_disk_gb:
+            type: integer
+            description: 最低可用磁盘要求(GB)
+          need_gpu:
+            type: boolean
+            description: 是否需要 GPU
+    returns:
+      type: object
+      description: 预检结果，包含 ok/warnings/snapshot/port_suggestions
+
+  - name: allocate_port
+    description: 在指定节点上分配一个可用端口
+    parameters:
+      node:
+        type: string
+        required: true
+      preferred:
+        type: integer
+        required: false
+        description: 优先尝试的端口号
+      range_start:
+        type: integer
+        default: 8000
+        description: 端口范围起始
+      range_end:
+        type: integer
+        default: 9000
+        description: 端口范围结束
+    returns:
+      type: integer
+      description: 分配的端口号
